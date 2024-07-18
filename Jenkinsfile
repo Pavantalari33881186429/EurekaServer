@@ -9,8 +9,9 @@ pipeline{
    }
 
    environment {
-        DOCKER_IMAGE = 'vayuputra123/amazonservice'
+        DOCKER_IMAGE = 'vayuputra123/eureka'
         DOCKER_CREDENTIALS_ID = 'DockerHubCreds'
+	BUILD_NUMBER = "${env.BUILD_NUMBER}"
     }
   
   stages{
@@ -20,7 +21,7 @@ pipeline{
     stage('Get code from Git'){
        steps{
            
-           git branch: 'main', url: 'https://github.com/Pavantalari33881186429/AmazonService.git'
+           git branch: 'main', url: 'https://github.com/Pavantalari33881186429/EurekaServer.git'
        }
     }
     
@@ -43,6 +44,7 @@ pipeline{
                 script {
                     // Build Docker image
                     docker.build("${DOCKER_IMAGE}:V${env.BUILD_NUMBER}")
+		    docker.build("${DOCKER_IMAGE}:latest")
                 }
             }
         }
@@ -66,8 +68,8 @@ pipeline{
 
           steps {
             withSonarQubeEnv('sonar') {
-               sh '''${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=AmazonService \
-                   -Dsonar.projectName=AmazonService \
+               sh '''${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=Eureka \
+                   -Dsonar.projectName=Eureka \
                    -Dsonar.projectVersion=1.0 \
                    -Dsonar.sources=src/main/java \
                    -Dsonar.java.binaries=target/classes \
@@ -88,7 +90,7 @@ pipeline{
             }
         }
 
-    stage('Docker Login') {
+  stage('Docker Login') {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
@@ -100,11 +102,19 @@ pipeline{
 
     stage('Docker Push') {
             steps {
+               sh 'docker push $DOCKER_IMAGE:V$BUILD_NUMBER'
+	       sh 'docker push $DOCKER_IMAGE:latest'
+            }
+        }
+
+	  stage('Docker Cleanup') {
+            steps {
                 script {
-                    
-                        sh 'docker push ${DOCKER_IMAGE}:V${env.BUILD_NUMBER}'
-                        
-                    
+                    // Remove Docker image from local workspace
+                    sh '''
+                    docker rmi $DOCKER_IMAGE:V$BUILD_NUMBER
+                    docker rmi $DOCKER_IMAGE:latest
+                    '''
                 }
             }
         }
